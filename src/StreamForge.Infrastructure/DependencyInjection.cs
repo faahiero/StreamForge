@@ -29,19 +29,15 @@ public static class DependencyInjection
             awsOptions.Credentials = new BasicAWSCredentials(accessKey, secretKey);
         }
 
-        services.AddDefaultAWSOptions(awsOptions);
-
         // Clientes AWS
         
-        // S3 com configuração Customizada (ForcePathStyle para LocalStack)
-        services.AddScoped<IAmazonS3>(sp =>
+        // IAmazonS3 com configuração Customizada (ForcePathStyle para LocalStack)
+        services.AddSingleton<IAmazonS3>(sp => // Registrado como Singleton
         {
             var s3Config = new AmazonS3Config();
             
-            // Mapeia região
             s3Config.RegionEndpoint = awsOptions.Region;
             
-            // Se tem ServiceURL explicita no JSON, aplica ForcePathStyle
             if (!string.IsNullOrEmpty(serviceUrl))
             {
                 s3Config.ServiceURL = serviceUrl;
@@ -51,16 +47,35 @@ public static class DependencyInjection
             return new AmazonS3Client(awsOptions.Credentials, s3Config);
         });
 
-        services.AddAWSService<IAmazonSQS>();
-        services.AddAWSService<IAmazonDynamoDB>();
+        // IAmazonSQS (Singleton)
+        services.AddSingleton<IAmazonSQS>(sp => {
+            var sqsConfig = new AmazonSQSConfig();
+            sqsConfig.RegionEndpoint = awsOptions.Region;
+            if (!string.IsNullOrEmpty(serviceUrl))
+            {
+                sqsConfig.ServiceURL = serviceUrl;
+            }
+            return new AmazonSQSClient(awsOptions.Credentials, sqsConfig);
+        });
+
+        // IAmazonDynamoDB (Singleton)
+        services.AddSingleton<IAmazonDynamoDB>(sp => {
+            var dynamoDbConfig = new AmazonDynamoDBConfig();
+            dynamoDbConfig.RegionEndpoint = awsOptions.Region;
+            if (!string.IsNullOrEmpty(serviceUrl))
+            {
+                dynamoDbConfig.ServiceURL = serviceUrl;
+            }
+            return new AmazonDynamoDBClient(awsOptions.Credentials, dynamoDbConfig);
+        });
 
         // Contexto do DynamoDB (High-Level API)
-        services.AddScoped<IDynamoDBContext, DynamoDBContext>();
+        services.AddSingleton<IDynamoDBContext, DynamoDBContext>(); 
 
         // Serviços
-        services.AddScoped<IStorageService, S3StorageService>();
-        services.AddScoped<IVideoRepository, VideoRepository>();
-
+        services.AddSingleton<IStorageService, S3StorageService>(); 
+        services.AddSingleton<IVideoRepository, VideoRepository>(); 
+        
         return services;
     }
 }
