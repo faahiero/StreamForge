@@ -1,5 +1,6 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DataModel;
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.SQS;
 using Microsoft.Extensions.Configuration;
@@ -15,12 +16,41 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // Configuração AWS (Lê do appsettings ou Variáveis de Ambiente)
+        // Configuração AWS
         var awsOptions = configuration.GetAWSOptions();
+
+        // Forçar credenciais se estiverem no config (Fix para LocalStack/Dev)
+        var accessKey = configuration["AWS:AccessKey"];
+        var secretKey = configuration["AWS:SecretKey"];
+        var serviceUrl = configuration["AWS:ServiceURL"];
+
+        if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
+        {
+            awsOptions.Credentials = new BasicAWSCredentials(accessKey, secretKey);
+        }
+
         services.AddDefaultAWSOptions(awsOptions);
 
         // Clientes AWS
-        services.AddAWSService<IAmazonS3>();
+        
+        // S3 com configuração Customizada (ForcePathStyle para LocalStack)
+        services.AddScoped<IAmazonS3>(sp =>
+        {
+            var s3Config = new AmazonS3Config();
+            
+            // Mapeia região
+            s3Config.RegionEndpoint = awsOptions.Region;
+            
+            // Se tem ServiceURL explicita no JSON, aplica ForcePathStyle
+            if (!string.IsNullOrEmpty(serviceUrl))
+            {
+                s3Config.ServiceURL = serviceUrl;
+                s3Config.ForcePathStyle = true;
+            }
+
+            return new AmazonS3Client(awsOptions.Credentials, s3Config);
+        });
+
         services.AddAWSService<IAmazonSQS>();
         services.AddAWSService<IAmazonDynamoDB>();
 

@@ -17,8 +17,8 @@ public class Video
     public TimeSpan? Duration { get; private set; }
     public string? Format { get; private set; }
 
-    // Construtor privado para EF Core / DynamoDB
-    private Video() 
+    // Construtor sem parâmetros (Exigido pelo DynamoDBContext SDK)
+    public Video() 
     {
         FileName = null!;
         OriginalName = null!;
