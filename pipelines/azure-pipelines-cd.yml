@@ -1,0 +1,37 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  dockerRegistryServiceConnection: 'AcrConnection' # Nome da Service Connection no Azure DevOps
+  imageRepository: 'streamforge-api'
+  containerRegistry: 'youracr.azurecr.io' # Substitua pelo seu ACR
+  dockerfilePath: 'src/StreamForge.API/Dockerfile'
+  tag: '$(Build.BuildId)'
+
+steps:
+- task: Docker@2
+  displayName: 'Build and Push API Image'
+  inputs:
+    command: buildAndPush
+    repository: $(imageRepository)
+    dockerfile: $(dockerfilePath)
+    containerRegistry: $(dockerRegistryServiceConnection)
+    tags: |
+      $(tag)
+      latest
+
+- task: Docker@2
+  displayName: 'Build and Push Worker Image'
+  inputs:
+    command: buildAndPush
+    repository: 'streamforge-worker'
+    dockerfile: 'src/StreamForge.Worker/Dockerfile'
+    containerRegistry: $(dockerRegistryServiceConnection)
+    tags: |
+      $(tag)
+      latest
