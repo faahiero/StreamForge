@@ -485,3 +485,4 @@ $RECYCLE.BIN/
 
 # LocalStack Data
 .localstack/
+ARCHITECTURE.md
