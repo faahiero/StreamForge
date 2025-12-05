@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # --------------------------------------------------------------------------
+  # LocalStack: Simula AWS S3, SQS, SNS, DynamoDB localmente
+  # --------------------------------------------------------------------------
+  localstack:
+    container_name: streamforge_localstack
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"            # Gateway Edge Port
+    environment:
+      - SERVICES=s3,sqs,sns,dynamodb
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - "./.localstack:/tmp/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
+  # --------------------------------------------------------------------------
+  # Redis: Cache Distribuído e Distributed Locking
+  # --------------------------------------------------------------------------
+  redis:
+    container_name: streamforge_redis
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  # --------------------------------------------------------------------------
+  # Jaeger: Observabilidade e Distributed Tracing (OpenTelemetry)
+  # --------------------------------------------------------------------------
+  jaeger:
+    container_name: streamforge_jaeger
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"          # Frontend UI
+      - "4317:4317"            # OTLP gRPC receiver
+      - "4318:4318"            # OTLP HTTP receiver
+
+volumes:
+  localstack_data:
