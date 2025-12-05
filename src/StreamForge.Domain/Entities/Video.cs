@@ -17,7 +17,7 @@ public class Video
     public TimeSpan? Duration { get; private set; }
     public string? Format { get; private set; }
 
-    // Construtor sem parâmetros (Exigido pelo DynamoDBContext SDK)
+    // Construtor sem parâmetros (Necessário para frameworks de mapeamento)
     public Video() 
     {
         FileName = null!;
@@ -35,7 +35,6 @@ public class Video
         OriginalName = originalName;
         Status = ProcessingStatus.Pending;
         CreatedAt = DateTime.UtcNow;
-        // Definindo um padrão de caminho no S3: videos/{Guid}/{nome-limpo}
         S3Key = $"videos/{Id}/{fileName}";
     }
 
@@ -69,4 +68,15 @@ public class Video
         Status = ProcessingStatus.Failed;
         ProcessedAt = DateTime.UtcNow;
     }
+
+    // Métodos auxiliares para mapeamento (opcional, se usarmos construtores ou setters públicos)
+    public void SetId(Guid id) => Id = id;
+    public void SetStatus(ProcessingStatus status) => Status = status;
+    public void SetCreatedAt(DateTime createdAt) => CreatedAt = createdAt;
+    public void SetProcessedAt(DateTime? processedAt) => ProcessedAt = processedAt;
+    public void SetS3Key(string s3Key) => S3Key = s3Key;
+    public void SetDuration(TimeSpan? duration) => Duration = duration;
+    public void SetFormat(string? format) => Format = format;
+    public void SetFileName(string fileName) => FileName = fileName;
+    public void SetOriginalName(string originalName) => OriginalName = originalName;
 }

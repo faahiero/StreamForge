@@ -486,3 +486,5 @@ $RECYCLE.BIN/
 # LocalStack Data
 .localstack/
 ARCHITECTURE.md
+test_e2e_full.sh
+*.log
