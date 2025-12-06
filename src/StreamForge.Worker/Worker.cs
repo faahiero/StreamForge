@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Amazon.SQS;
 using Amazon.SQS.Model;
-using StreamForge.Application.Interfaces; // Importar
+using StreamForge.Application.Interfaces;
 using StreamForge.Worker.Models;
 using StreamForge.Worker.Services;
 
@@ -12,16 +12,16 @@ public class Worker : BackgroundService
     private readonly ILogger<Worker> _logger;
     private readonly IAmazonSQS _sqsClient;
     private readonly IVideoProcessor _videoProcessor;
-    private readonly IDistributedLockService _lockService; // Injeter Lock Service
+    private readonly IDistributedLockService _lockService;
     private readonly string _queueUrl;
 
     public Worker(ILogger<Worker> logger, IAmazonSQS sqsClient, IConfiguration configuration, 
-                  IVideoProcessor videoProcessor, IDistributedLockService lockService) // Adicionar no construtor
+                  IVideoProcessor videoProcessor, IDistributedLockService lockService)
     {
         _logger = logger;
         _sqsClient = sqsClient;
         _videoProcessor = videoProcessor;
-        _lockService = lockService; // Inicializar
+        _lockService = lockService;
         _queueUrl = configuration["AWS:QueueUrl"] ?? throw new ArgumentNullException("AWS:QueueUrl configuration is missing");
     }
 
@@ -29,36 +29,50 @@ public class Worker : BackgroundService
     {
         _logger.LogInformation("🚀 Worker iniciado. Fila: {QueueUrl}", _queueUrl);
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                var request = new ReceiveMessageRequest
+                try
                 {
-                    QueueUrl = _queueUrl,
-                    MaxNumberOfMessages = 1,
-                    WaitTimeSeconds = 5
-                };
-
-                var response = await _sqsClient.ReceiveMessageAsync(request, stoppingToken);
-
-                if (response.Messages != null && response.Messages.Count > 0)
-                {
-                    foreach (var message in response.Messages)
+                    var request = new ReceiveMessageRequest
                     {
-                        await ProcessMessageAsync(message);
-                        
-                        // Delete after success
-                        await _sqsClient.DeleteMessageAsync(_queueUrl, message.ReceiptHandle, stoppingToken);
+                        QueueUrl = _queueUrl,
+                        MaxNumberOfMessages = 1,
+                        WaitTimeSeconds = 5
+                    };
+
+                    var response = await _sqsClient.ReceiveMessageAsync(request, stoppingToken);
+
+                    if (response.Messages != null && response.Messages.Count > 0)
+                    {
+                        foreach (var message in response.Messages)
+                        {
+                            await ProcessMessageAsync(message);
+                            
+                            // Delete after success
+                            await _sqsClient.DeleteMessageAsync(_queueUrl, message.ReceiptHandle, stoppingToken);
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "❌ Erro fatal no loop do Worker.");
-                await Task.Delay(5000, stoppingToken);
+                catch (OperationCanceledException)
+                {
+                    // Graceful shutdown, ignore
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "❌ Erro fatal no loop do Worker.");
+                    await Task.Delay(5000, stoppingToken);
+                }
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Ensure outer loop also exits cleanly
+        }
+
+        _logger.LogInformation("🛑 Worker finalizando...");
     }
 
     private async Task ProcessMessageAsync(Message message)
