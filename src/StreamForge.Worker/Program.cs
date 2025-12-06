@@ -18,8 +18,15 @@ builder.Services.AddSerilog((services, lc) => lc
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // 3. Serviços do Worker
-builder.Services.AddSingleton<IVideoProcessor, VideoProcessor>(); // Alterado para Singleton
+builder.Services.AddSingleton<QueueInitializer>(); // Inicializador de Fila
+builder.Services.AddSingleton<IVideoProcessor, VideoProcessor>();
 builder.Services.AddHostedService<Worker>();
 
 var host = builder.Build();
+
+// 4. Inicialização de Infraestrutura (Auto-Provisionamento em Dev)
+// Resolvemos o QueueInitializer e rodamos a verificação
+var queueInitializer = host.Services.GetRequiredService<QueueInitializer>();
+await queueInitializer.EnsureQueueExistsAsync();
+
 host.Run();
