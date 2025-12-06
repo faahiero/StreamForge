@@ -9,20 +9,23 @@ services:
       context: .
       dockerfile: src/StreamForge.API/Dockerfile
     ports:
-      - "5123:8080"
+      - "5200:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - AWS__ServiceURL=http://localstack:4566
+      - AWS__ExternalServiceUrl=http://localhost:4566
       - AWS__AccessKey=test
       - AWS__SecretKey=test
       - AWS__Region=us-east-1
       - AWS__BucketName=streamforge-videos-local
       - ConnectionStrings__Redis=redis:6379
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://seq:4317
+      - Serilog__WriteTo__0__Name=Seq
+      - Serilog__WriteTo__0__Args__serverUrl=http://seq:5341
     depends_on:
       - localstack
       - redis
-      - jaeger
+      - seq
 
   # --------------------------------------------------------------------------
   # Worker: Processamento em Background
@@ -39,11 +42,13 @@ services:
       - AWS__SecretKey=test
       - AWS__Region=us-east-1
       - ConnectionStrings__Redis=redis:6379
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://seq:4317
+      - Serilog__WriteTo__0__Name=Seq
+      - Serilog__WriteTo__0__Args__serverUrl=http://seq:5341
     depends_on:
       - localstack
       - redis
-      - jaeger
+      - seq
 
   # --------------------------------------------------------------------------
   # LocalStack: Simula AWS S3, SQS, SNS, DynamoDB localmente
@@ -52,7 +57,7 @@ services:
     container_name: streamforge_localstack
     image: localstack/localstack:latest
     ports:
-      - "4566:4566"            # Gateway Edge Port
+      - "4566:4566" # Gateway Edge Port
     environment:
       - SERVICES=s3,sqs,sns,dynamodb
       - DEBUG=1
@@ -75,17 +80,17 @@ services:
       - "6379:6379"
 
   # --------------------------------------------------------------------------
-  # Jaeger: Observabilidade e Distributed Tracing (OpenTelemetry)
+  # Seq: Logs Estruturados e Tracing (Substitui Jaeger)
   # --------------------------------------------------------------------------
-  jaeger:
-    container_name: streamforge_jaeger
-    image: jaegertracing/all-in-one:latest
+  seq:
+    container_name: streamforge_seq
+    image: datalust/seq:latest
     environment:
-      - COLLECTOR_OTLP_ENABLED=true
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORD=admin
     ports:
-      - "16686:16686"          # Frontend UI
-      - "4317:4317"            # OTLP gRPC receiver
-      - "4318:4318"            # OTLP HTTP receiver
+      - "5341:80" # UI e Ingestão HTTP de Logs
+      - "4317:4317" # Ingestão OTLP gRPC (Traces)
 
 volumes:
   localstack_data:

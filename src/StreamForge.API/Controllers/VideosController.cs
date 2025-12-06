@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using StreamForge.Application.Features.Videos.Commands.InitiateUpload;
+using StreamForge.Application.Features.Videos.Queries.GetVideoById;
 
 namespace StreamForge.API.Controllers;
 
@@ -20,6 +21,18 @@ public class VideosController : ControllerBase
     public async Task<IActionResult> InitiateUpload([FromBody] InitiateUploadCommand command)
     {
         var result = await _mediator.Send(command);
+        return Ok(result);
+    }
+
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(VideoDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetVideoById(Guid id)
+    {
+        var result = await _mediator.Send(new GetVideoByIdQuery(id));
+        if (result == null)
+            return NotFound();
+
         return Ok(result);
     }
 }
