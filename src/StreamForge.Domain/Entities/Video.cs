@@ -46,8 +46,8 @@ public class Video
 
     public void MarkAsProcessing()
     {
-        if (Status != ProcessingStatus.Pending)
-            throw new InvalidOperationException($"Cannot start processing video in status {Status}");
+        if (Status != ProcessingStatus.Pending && Status != ProcessingStatus.Failed)
+            throw new InvalidOperationException($"Cannot start processing video in status {Status}. Only Pending or Failed videos can be processed.");
 
         Status = ProcessingStatus.Processing;
     }
