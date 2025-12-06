@@ -3,13 +3,14 @@ using Amazon.DynamoDBv2.DataModel;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.SQS;
+using Amazon.SimpleNotificationService; // Importar SNS
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StreamForge.Application.Interfaces;
 using StreamForge.Domain.Interfaces;
 using StreamForge.Infrastructure.Repositories;
 using StreamForge.Infrastructure.Services;
-using StackExchange.Redis; // Importar
+using StackExchange.Redis;
 
 namespace StreamForge.Infrastructure;
 
@@ -31,7 +32,9 @@ public static class DependencyInjection
         }
 
         // Clientes AWS
-        services.AddSingleton<IAmazonS3>(sp => // Registrado como Singleton
+        
+        // S3
+        services.AddSingleton<IAmazonS3>(sp => 
         {
             var s3Config = new AmazonS3Config();
             s3Config.RegionEndpoint = awsOptions.Region;
@@ -43,6 +46,7 @@ public static class DependencyInjection
             return new AmazonS3Client(awsOptions.Credentials, s3Config);
         });
 
+        // SQS
         services.AddSingleton<IAmazonSQS>(sp => {
             var sqsConfig = new AmazonSQSConfig();
             sqsConfig.RegionEndpoint = awsOptions.Region;
@@ -53,6 +57,7 @@ public static class DependencyInjection
             return new AmazonSQSClient(awsOptions.Credentials, sqsConfig);
         });
 
+        // DynamoDB
         services.AddSingleton<IAmazonDynamoDB>(sp => {
             var dynamoDbConfig = new AmazonDynamoDBConfig();
             dynamoDbConfig.RegionEndpoint = awsOptions.Region;
@@ -63,12 +68,24 @@ public static class DependencyInjection
             return new AmazonDynamoDBClient(awsOptions.Credentials, dynamoDbConfig);
         });
 
-        // Contexto do DynamoDB (High-Level API)
+        // SNS (Novo)
+        services.AddSingleton<IAmazonSimpleNotificationService>(sp => {
+            var snsConfig = new AmazonSimpleNotificationServiceConfig();
+            snsConfig.RegionEndpoint = awsOptions.Region;
+            if (!string.IsNullOrEmpty(serviceUrl))
+            {
+                snsConfig.ServiceURL = serviceUrl;
+            }
+            return new AmazonSimpleNotificationServiceClient(awsOptions.Credentials, snsConfig);
+        });
+
+        // Contexto do DynamoDB
         services.AddSingleton<IDynamoDBContext, DynamoDBContext>(); 
 
-        // Serviços de Infraestrutura
+        // Serviços de Infra
         services.AddSingleton<IStorageService, S3StorageService>(); 
         services.AddSingleton<IVideoRepository, VideoRepository>(); 
+        services.AddSingleton<IMessagePublisher, SnsMessagePublisher>(); // Registrar Publisher
         
         // Redis
         services.AddSingleton<IConnectionMultiplexer>(sp => 
