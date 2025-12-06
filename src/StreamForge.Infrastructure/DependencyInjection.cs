@@ -9,6 +9,7 @@ using StreamForge.Application.Interfaces;
 using StreamForge.Domain.Interfaces;
 using StreamForge.Infrastructure.Repositories;
 using StreamForge.Infrastructure.Services;
+using StackExchange.Redis; // Importar
 
 namespace StreamForge.Infrastructure;
 
@@ -30,24 +31,18 @@ public static class DependencyInjection
         }
 
         // Clientes AWS
-        
-        // IAmazonS3 com configuração Customizada (ForcePathStyle para LocalStack)
         services.AddSingleton<IAmazonS3>(sp => // Registrado como Singleton
         {
             var s3Config = new AmazonS3Config();
-            
             s3Config.RegionEndpoint = awsOptions.Region;
-            
             if (!string.IsNullOrEmpty(serviceUrl))
             {
                 s3Config.ServiceURL = serviceUrl;
                 s3Config.ForcePathStyle = true;
             }
-
             return new AmazonS3Client(awsOptions.Credentials, s3Config);
         });
 
-        // IAmazonSQS (Singleton)
         services.AddSingleton<IAmazonSQS>(sp => {
             var sqsConfig = new AmazonSQSConfig();
             sqsConfig.RegionEndpoint = awsOptions.Region;
@@ -58,7 +53,6 @@ public static class DependencyInjection
             return new AmazonSQSClient(awsOptions.Credentials, sqsConfig);
         });
 
-        // IAmazonDynamoDB (Singleton)
         services.AddSingleton<IAmazonDynamoDB>(sp => {
             var dynamoDbConfig = new AmazonDynamoDBConfig();
             dynamoDbConfig.RegionEndpoint = awsOptions.Region;
@@ -72,10 +66,15 @@ public static class DependencyInjection
         // Contexto do DynamoDB (High-Level API)
         services.AddSingleton<IDynamoDBContext, DynamoDBContext>(); 
 
-        // Serviços
+        // Serviços de Infraestrutura
         services.AddSingleton<IStorageService, S3StorageService>(); 
         services.AddSingleton<IVideoRepository, VideoRepository>(); 
         
+        // Redis
+        services.AddSingleton<IConnectionMultiplexer>(sp => 
+            ConnectionMultiplexer.Connect(configuration.GetConnectionString("Redis") ?? "localhost:6379"));
+        services.AddSingleton<IDistributedLockService, RedisLockService>();
+
         return services;
     }
 }
