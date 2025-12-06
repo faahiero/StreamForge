@@ -1,5 +1,6 @@
 using StreamForge.Application;
 using StreamForge.Infrastructure;
+using StreamForge.Infrastructure.HealthChecks; // Importar namespace
 using Serilog;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
@@ -22,23 +23,27 @@ builder.Services.AddOpenTelemetry()
         tracerProviderBuilder
             .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("StreamForge.API"))
             .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation() // Para rastrear chamadas HTTP (incluindo AWS SDK se usar HTTP)
-            // .AddAWSInstrumentation() // Requer pacote opcional OpenTelemetry.Contrib.Instrumentation.AWS
-            .AddOtlpExporter(); // Envia para Jaeger/Collector (default: localhost:4317)
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter();
     });
 
 // 3. Adicionar Camadas (Clean Architecture)
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// 4. Adicionar Controllers e OpenAPI
+// 4. Health Checks
+builder.Services.AddHealthChecks()
+    .AddCheck<S3HealthCheck>("S3")
+    .AddCheck<DynamoDBHealthCheck>("DynamoDB");
+
+// 5. Adicionar Controllers e OpenAPI
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// 5. Middleware Pipeline
+// 6. Middleware Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -48,6 +53,8 @@ if (app.Environment.IsDevelopment())
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
 app.UseAuthorization();
+
+app.MapHealthChecks("/health"); // Endpoint de saúde
 app.MapControllers();
 
 app.Run();
