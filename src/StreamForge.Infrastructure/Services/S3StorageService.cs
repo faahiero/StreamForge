@@ -9,11 +9,13 @@ public class S3StorageService : IStorageService
 {
     private readonly IAmazonS3 _s3Client;
     private readonly string _bucketName;
+    private readonly string? _externalServiceUrl;
 
     public S3StorageService(IAmazonS3 s3Client, IConfiguration configuration)
     {
         _s3Client = s3Client ?? throw new ArgumentNullException(nameof(s3Client));
-        _bucketName = configuration["AWS:BucketName"] ?? "streamforge-videos"; // Fallback ou lança erro
+        _bucketName = configuration["AWS:BucketName"] ?? "streamforge-videos";
+        _externalServiceUrl = configuration["AWS:ExternalServiceUrl"];
     }
 
     public async Task<string> GeneratePresignedUploadUrlAsync(string key, string contentType, TimeSpan expiration)
@@ -34,7 +36,21 @@ public class S3StorageService : IStorageService
         // Metadata opcional para rastreamento
         request.ResponseHeaderOverrides.ContentType = contentType;
 
-        return _s3Client.GetPreSignedURL(request);
+        var url = _s3Client.GetPreSignedURL(request);
+
+        if (!string.IsNullOrEmpty(_externalServiceUrl) && Uri.TryCreate(url, UriKind.Absolute, out var originalUri))
+        {
+            var externalUri = new Uri(_externalServiceUrl);
+            var builder = new UriBuilder(originalUri)
+            {
+                Scheme = externalUri.Scheme,
+                Host = externalUri.Host,
+                Port = externalUri.Port
+            };
+            return builder.Uri.ToString();
+        }
+
+        return url;
     }
 
     private async Task EnsureBucketExistsAsync()
