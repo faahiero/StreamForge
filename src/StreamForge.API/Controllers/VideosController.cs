@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using StreamForge.Application.Features.Videos.Commands.InitiateUpload;
 using StreamForge.Application.Features.Videos.Queries.GetVideoById;
@@ -17,13 +18,15 @@ public class VideosController : ControllerBase
     }
 
     [HttpPost("init")]
+    [Authorize] // Requer token JWT válido
     [ProducesResponseType(typeof(InitiateUploadResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> InitiateUpload([FromBody] InitiateUploadCommand command)
     {
         var result = await _mediator.Send(command);
         return Ok(result);
     }
-
+    
+    
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(VideoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
