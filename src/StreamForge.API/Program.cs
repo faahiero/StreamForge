@@ -1,9 +1,13 @@
 using StreamForge.Application;
 using StreamForge.Infrastructure;
-using StreamForge.Infrastructure.HealthChecks; // Importar namespace
+using StreamForge.Infrastructure.HealthChecks; 
 using Serilog;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
+using Microsoft.AspNetCore.Authentication.JwtBearer; 
+using Microsoft.IdentityModel.Tokens; 
+using System.Text;
+using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,14 +40,57 @@ builder.Services.AddHealthChecks()
     .AddCheck<S3HealthCheck>("S3")
     .AddCheck<DynamoDBHealthCheck>("DynamoDB");
 
-// 5. Adicionar Controllers e OpenAPI
+// 5. Autenticação JWT
+builder.Services
+    .AddAuthorization()
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        var jwtKey = builder.Configuration["Jwt:Key"] ?? "super-secret-key-for-dev-1234567890";
+        var key = Encoding.UTF8.GetBytes(jwtKey);
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "StreamForge",
+            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "StreamForgeUsers",
+            IssuerSigningKey = new SymmetricSecurityKey(key)
+        };
+    });
+
+// 6. Adicionar Controllers e OpenAPI
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddOpenApi();
+
+// Configurar Swagger com JWT Support
+builder.Services.AddSwaggerGen(options =>
+{
+    options.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT"
+    });
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("bearer", document)] = []
+    });
+});
 
 var app = builder.Build();
 
-// 6. Middleware Pipeline
+// 7. Middleware Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -52,9 +99,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
+
+app.UseAuthentication(); 
 app.UseAuthorization();
 
-app.MapHealthChecks("/health"); // Endpoint de saúde
+app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();

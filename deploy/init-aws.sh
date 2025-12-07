@@ -11,6 +11,12 @@ awslocal dynamodb create-table \
     --key-schema AttributeName=Id,KeyType=HASH \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
 
+awslocal dynamodb create-table \
+    --table-name User \
+    --attribute-definitions AttributeName=Email,AttributeType=S \
+    --key-schema AttributeName=Email,KeyType=HASH \
+    --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
+
 # 3. Criar Fila SQS + DLQ
 awslocal sqs create-queue --queue-name streamforge-ingestion-queue-dlq
 awslocal sqs create-queue --queue-name streamforge-ingestion-queue \

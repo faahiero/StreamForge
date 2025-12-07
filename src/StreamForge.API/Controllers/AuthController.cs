@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using StreamForge.API.Services;
+using StreamForge.Application.Features.Auth.Commands.LoginUser;
+using StreamForge.Application.Features.Auth.Commands.RegisterUser;
 
 namespace StreamForge.API.Controllers;
 
@@ -7,23 +9,31 @@ namespace StreamForge.API.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly TokenService _tokenService;
+    private readonly IMediator _mediator;
 
-    public AuthController(TokenService tokenService)
+    public AuthController(IMediator mediator)
     {
-        _tokenService = tokenService;
+        _mediator = mediator;
+    }
+
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterUserCommand command)
+    {
+        var userId = await _mediator.Send(command);
+        return CreatedAtAction(nameof(Register), new { id = userId }, new { UserId = userId });
     }
 
     [HttpPost("login")]
-    public IActionResult Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginUserCommand command)
     {
-        // Mock de validação: Aceita qualquer coisa não vazia
-        if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
-            return BadRequest("Invalid credentials");
-
-        var token = _tokenService.GenerateToken(request.Username);
-        return Ok(new { Token = token });
+        try
+        {
+            var token = await _mediator.Send(command);
+            return Ok(new { Token = token });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
+        }
     }
 }
-
-public record LoginRequest(string Username, string Password);

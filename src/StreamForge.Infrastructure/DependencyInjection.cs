@@ -82,10 +82,15 @@ public static class DependencyInjection
         // Contexto do DynamoDB
         services.AddSingleton<IDynamoDBContext, DynamoDBContext>(); 
 
-        // Serviços de Infra
+        // Serviços
         services.AddSingleton<IStorageService, S3StorageService>(); 
         services.AddSingleton<IVideoRepository, VideoRepository>(); 
-        services.AddSingleton<IMessagePublisher, SnsMessagePublisher>(); // Registrar Publisher
+        services.AddSingleton<IMessagePublisher, SnsMessagePublisher>(); 
+        
+        // Auth
+        services.AddSingleton<IUserRepository, UserRepository>();
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
+        services.AddSingleton<ITokenService, TokenService>();
         
         // Redis
         services.AddSingleton<IConnectionMultiplexer>(sp => 
