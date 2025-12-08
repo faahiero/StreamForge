@@ -489,3 +489,4 @@ ARCHITECTURE.md
 test_e2e_full.sh
 *.log
 test_*.sh
+*.mp4

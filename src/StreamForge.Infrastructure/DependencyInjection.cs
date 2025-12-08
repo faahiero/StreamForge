@@ -86,6 +86,7 @@ public static class DependencyInjection
         services.AddSingleton<IStorageService, S3StorageService>(); 
         services.AddSingleton<IVideoRepository, VideoRepository>(); 
         services.AddSingleton<IMessagePublisher, SnsMessagePublisher>(); 
+        services.AddSingleton<IMediaAnalyzer, FfmpegMediaAnalyzer>(); // Registrar Analyzer
         
         // Auth
         services.AddSingleton<IUserRepository, UserRepository>();

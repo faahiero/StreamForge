@@ -15,15 +15,17 @@ public class VideoProcessor : IVideoProcessor
 {
     private readonly IAmazonS3 _s3Client;
     private readonly IVideoRepository _videoRepository;
-    private readonly IMessagePublisher _publisher; // Injetar Publisher
+    private readonly IMessagePublisher _publisher;
+    private readonly IMediaAnalyzer _mediaAnalyzer; // Injetar Analyzer
     private readonly ILogger<VideoProcessor> _logger;
 
     public VideoProcessor(IAmazonS3 s3Client, IVideoRepository videoRepository, 
-                          IMessagePublisher publisher, ILogger<VideoProcessor> logger)
+                          IMessagePublisher publisher, IMediaAnalyzer mediaAnalyzer, ILogger<VideoProcessor> logger)
     {
         _s3Client = s3Client;
         _videoRepository = videoRepository;
         _publisher = publisher;
+        _mediaAnalyzer = mediaAnalyzer;
         _logger = logger;
     }
 
@@ -32,49 +34,37 @@ public class VideoProcessor : IVideoProcessor
         var bucketName = record.S3?.Bucket?.Name;
         var objectKey = record.S3?.Object?.Key;
 
-        if (string.IsNullOrEmpty(bucketName) || string.IsNullOrEmpty(objectKey))
-        {
-            _logger.LogWarning("Evento S3 inválido: Bucket ou Key nulos.");
-            return;
-        }
+        if (string.IsNullOrEmpty(bucketName) || string.IsNullOrEmpty(objectKey)) return;
 
         objectKey = System.Net.WebUtility.UrlDecode(objectKey);
-
-        _logger.LogInformation("🎬 Iniciando processamento do vídeo: {Key}", objectKey);
-
         var videoIdString = objectKey.Split('/')[1];
-        if (!Guid.TryParse(videoIdString, out var videoId))
-        {
-            _logger.LogError("❌ Falha ao extrair VideoId da chave: {Key}", objectKey);
-            return;
-        }
+        if (!Guid.TryParse(videoIdString, out var videoId)) return;
 
         var video = await _videoRepository.GetByIdAsync(videoId);
-        if (video == null)
-        {
-            _logger.LogError("❌ Vídeo não encontrado no banco: {VideoId}", videoId);
-            return;
-        }
+        if (video == null) return;
 
         video.MarkAsProcessing();
         await _videoRepository.UpdateAsync(video);
 
+        var tempFile = Path.Combine(Path.GetTempPath(), $"{videoId}.mp4");
+
         try
         {
-            var metadata = await _s3Client.GetObjectMetadataAsync(bucketName, objectKey);
-            _logger.LogInformation("📥 Arquivo verificado no S3. Tamanho: {Size} bytes", metadata.ContentLength);
+            _logger.LogInformation("📥 Baixando arquivo do S3...");
+            var s3Object = await _s3Client.GetObjectAsync(bucketName, objectKey);
+            using (var fileStream = File.Create(tempFile))
+            {
+                await s3Object.ResponseStream.CopyToAsync(fileStream);
+            }
 
-            await Task.Delay(2000); 
-            
-            var simulatedDuration = TimeSpan.FromSeconds(new Random().Next(60, 3600));
-            var simulatedFormat = "mp4";
+            _logger.LogInformation("🎥 Analisando mídia com FFprobe...");
+            var metadata = await _mediaAnalyzer.AnalyzeAsync(tempFile);
 
-            video.CompleteProcessing(simulatedDuration, simulatedFormat);
+            _logger.LogInformation("✅ Metadados: Duração {Duration}, Formato {Format}", metadata.Duration, metadata.Format);
+
+            video.CompleteProcessing(metadata.Duration, metadata.Format);
             await _videoRepository.UpdateAsync(video);
 
-            _logger.LogInformation("✅ Vídeo {VideoId} processado com sucesso!", videoId);
-
-            // Publicar Evento no SNS
             await _publisher.PublishAsync("streamforge-video-events", new 
             {
                 VideoId = video.Id,
@@ -85,10 +75,14 @@ public class VideoProcessor : IVideoProcessor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "❌ Falha no processamento do vídeo {VideoId}", videoId);
+            _logger.LogError(ex, "❌ Falha no processamento real");
             video.FailProcessing();
             await _videoRepository.UpdateAsync(video);
             throw;
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
         }
     }
 }
