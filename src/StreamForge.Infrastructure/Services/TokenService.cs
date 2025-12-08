@@ -1,25 +1,26 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options; // Importar Options
 using Microsoft.IdentityModel.Tokens;
 using StreamForge.Application.Interfaces;
 using StreamForge.Domain.Entities;
+using StreamForge.Infrastructure.Options; // Importar Options Class
 
 namespace StreamForge.Infrastructure.Services;
 
 public class TokenService : ITokenService
 {
-    private readonly IConfiguration _configuration;
+    private readonly JwtSettings _settings;
 
-    public TokenService(IConfiguration configuration)
+    public TokenService(IOptions<JwtSettings> options)
     {
-        _configuration = configuration;
+        _settings = options.Value;
     }
 
     public string GenerateToken(User user)
     {
-        var jwtKey = _configuration["Jwt:Key"] ?? "super-secret-key-for-dev-1234567890"; 
+        var jwtKey = _settings.Key ?? "super-secret-key-for-dev-1234567890"; 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -31,8 +32,8 @@ public class TokenService : ITokenService
         };
 
         var token = new JwtSecurityToken(
-            issuer: _configuration["Jwt:Issuer"] ?? "StreamForge",
-            audience: _configuration["Jwt:Audience"] ?? "StreamForgeUsers",
+            issuer: _settings.Issuer ?? "StreamForge",
+            audience: _settings.Audience ?? "StreamForgeUsers",
             claims: claims,
             expires: DateTime.UtcNow.AddHours(2),
             signingCredentials: creds

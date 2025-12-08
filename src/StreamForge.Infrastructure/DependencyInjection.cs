@@ -6,11 +6,13 @@ using Amazon.SQS;
 using Amazon.SimpleNotificationService;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options; // Importar
 using StreamForge.Application.Interfaces;
 using StreamForge.Domain.Interfaces;
 using StreamForge.Infrastructure.Repositories;
 using StreamForge.Infrastructure.Services;
 using StreamForge.Infrastructure.Mappers;
+using StreamForge.Infrastructure.Options; // Importar
 using StackExchange.Redis;
 
 namespace StreamForge.Infrastructure;
@@ -19,65 +21,119 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // Configuração AWS
+        // Configurar Options
+        services.Configure<AwsSettings>(configuration.GetSection(AwsSettings.SectionName));
+        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+
+        // Obter configurações para setup inicial dos clientes (que são Singletons)
+        // Nota: Para Singleton, precisamos extrair o valor agora ou usar factory com IOptions
+        var awsSettings = new AwsSettings();
+        configuration.GetSection(AwsSettings.SectionName).Bind(awsSettings);
+
+        // Configuração AWS SDK Base
         var awsOptions = configuration.GetAWSOptions();
-
-        // Forçar credenciais se estiverem no config (Fix para LocalStack/Dev)
-        var accessKey = configuration["AWS:AccessKey"];
-        var secretKey = configuration["AWS:SecretKey"];
-        var serviceUrl = configuration["AWS:ServiceURL"];
-
-        if (!string.IsNullOrEmpty(accessKey) && !string.IsNullOrEmpty(secretKey))
+        
+        // Override com valores do Options se existirem (LocalStack/Dev)
+        if (!string.IsNullOrEmpty(awsSettings.AccessKey) && !string.IsNullOrEmpty(awsSettings.SecretKey))
         {
-            awsOptions.Credentials = new BasicAWSCredentials(accessKey, secretKey);
+            awsOptions.Credentials = new BasicAWSCredentials(awsSettings.AccessKey, awsSettings.SecretKey);
+        }
+        if (!string.IsNullOrEmpty(awsSettings.Region))
+        {
+            awsOptions.Region = Amazon.RegionEndpoint.GetBySystemName(awsSettings.Region);
         }
 
-        // Clientes AWS
+        // Clientes AWS (Singleton Factory)
         
         // S3
         services.AddSingleton<IAmazonS3>(sp => 
         {
+            var settings = sp.GetRequiredService<IOptions<AwsSettings>>().Value;
             var s3Config = new AmazonS3Config();
-            s3Config.RegionEndpoint = awsOptions.Region;
-            if (!string.IsNullOrEmpty(serviceUrl))
+            
+            // Se o Region do appsettings for válido, usa. Senão usa o do profile.
+            if(!string.IsNullOrEmpty(settings.Region)) 
+                s3Config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(settings.Region);
+            else 
+                s3Config.RegionEndpoint = awsOptions.Region;
+
+            if (!string.IsNullOrEmpty(settings.ServiceURL))
             {
-                s3Config.ServiceURL = serviceUrl;
+                s3Config.ServiceURL = settings.ServiceURL;
                 s3Config.ForcePathStyle = true;
             }
-            return new AmazonS3Client(awsOptions.Credentials, s3Config);
+
+            var creds = awsOptions.Credentials; // Default
+            if (!string.IsNullOrEmpty(settings.AccessKey) && !string.IsNullOrEmpty(settings.SecretKey))
+                creds = new BasicAWSCredentials(settings.AccessKey, settings.SecretKey);
+
+            return new AmazonS3Client(creds, s3Config);
         });
 
         // SQS
         services.AddSingleton<IAmazonSQS>(sp => {
+            var settings = sp.GetRequiredService<IOptions<AwsSettings>>().Value;
             var sqsConfig = new AmazonSQSConfig();
-            sqsConfig.RegionEndpoint = awsOptions.Region;
-            if (!string.IsNullOrEmpty(serviceUrl))
+            
+            if(!string.IsNullOrEmpty(settings.Region)) 
+                sqsConfig.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(settings.Region);
+            else 
+                sqsConfig.RegionEndpoint = awsOptions.Region;
+
+            if (!string.IsNullOrEmpty(settings.ServiceURL))
             {
-                sqsConfig.ServiceURL = serviceUrl;
+                sqsConfig.ServiceURL = settings.ServiceURL;
             }
-            return new AmazonSQSClient(awsOptions.Credentials, sqsConfig);
+
+            var creds = awsOptions.Credentials;
+            if (!string.IsNullOrEmpty(settings.AccessKey) && !string.IsNullOrEmpty(settings.SecretKey))
+                creds = new BasicAWSCredentials(settings.AccessKey, settings.SecretKey);
+
+            return new AmazonSQSClient(creds, sqsConfig);
         });
 
         // DynamoDB
         services.AddSingleton<IAmazonDynamoDB>(sp => {
-            var dynamoDbConfig = new AmazonDynamoDBConfig();
-            dynamoDbConfig.RegionEndpoint = awsOptions.Region;
-            if (!string.IsNullOrEmpty(serviceUrl))
+            var settings = sp.GetRequiredService<IOptions<AwsSettings>>().Value;
+            var dbConfig = new AmazonDynamoDBConfig();
+            
+            if(!string.IsNullOrEmpty(settings.Region)) 
+                dbConfig.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(settings.Region);
+            else 
+                dbConfig.RegionEndpoint = awsOptions.Region;
+
+            if (!string.IsNullOrEmpty(settings.ServiceURL))
             {
-                dynamoDbConfig.ServiceURL = serviceUrl;
+                dbConfig.ServiceURL = settings.ServiceURL;
             }
-            return new AmazonDynamoDBClient(awsOptions.Credentials, dynamoDbConfig);
+
+            var creds = awsOptions.Credentials;
+            if (!string.IsNullOrEmpty(settings.AccessKey) && !string.IsNullOrEmpty(settings.SecretKey))
+                creds = new BasicAWSCredentials(settings.AccessKey, settings.SecretKey);
+
+            return new AmazonDynamoDBClient(creds, dbConfig);
         });
 
         // SNS
         services.AddSingleton<IAmazonSimpleNotificationService>(sp => {
+            var settings = sp.GetRequiredService<IOptions<AwsSettings>>().Value;
             var snsConfig = new AmazonSimpleNotificationServiceConfig();
-            snsConfig.RegionEndpoint = awsOptions.Region;
-            if (!string.IsNullOrEmpty(serviceUrl))
+            
+            if(!string.IsNullOrEmpty(settings.Region)) 
+                snsConfig.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(settings.Region);
+            else 
+                snsConfig.RegionEndpoint = awsOptions.Region;
+
+            if (!string.IsNullOrEmpty(settings.ServiceURL))
             {
-                snsConfig.ServiceURL = serviceUrl;
+                snsConfig.ServiceURL = settings.ServiceURL;
             }
-            return new AmazonSimpleNotificationServiceClient(awsOptions.Credentials, snsConfig);
+
+            var creds = awsOptions.Credentials;
+            if (!string.IsNullOrEmpty(settings.AccessKey) && !string.IsNullOrEmpty(settings.SecretKey))
+                creds = new BasicAWSCredentials(settings.AccessKey, settings.SecretKey);
+
+            return new AmazonSimpleNotificationServiceClient(creds, snsConfig);
         });
 
         // Contexto do DynamoDB (High-Level API)

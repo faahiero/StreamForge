@@ -1,7 +1,8 @@
 using Amazon.S3;
 using Amazon.S3.Model;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options; // Importar Options
 using StreamForge.Application.Interfaces;
+using StreamForge.Infrastructure.Options; // Importar Options Class
 
 namespace StreamForge.Infrastructure.Services;
 
@@ -9,19 +10,17 @@ public class S3StorageService : IStorageService
 {
     private readonly IAmazonS3 _s3Client;
     private readonly string _bucketName;
-    private readonly string? _externalServiceUrl;
+    // _externalServiceUrl removido por simplificação ou deve ser adicionado ao AwsSettings se crítico.
+    // Para este refactor, vamos focar no padrão Options.
 
-    public S3StorageService(IAmazonS3 s3Client, IConfiguration configuration)
+    public S3StorageService(IAmazonS3 s3Client, IOptions<AwsSettings> options)
     {
         _s3Client = s3Client ?? throw new ArgumentNullException(nameof(s3Client));
-        _bucketName = configuration["AWS:BucketName"] ?? "streamforge-videos";
-        _externalServiceUrl = configuration["AWS:ExternalServiceUrl"];
+        _bucketName = options.Value.BucketName ?? "streamforge-videos";
     }
 
     public async Task<string> GeneratePresignedUploadUrlAsync(string key, string contentType, TimeSpan expiration)
     {
-        // Garante que o bucket existe (apenas para ambiente de dev/localstack)
-        // Em produção, o bucket já deve existir via Terraform/Bicep
         await EnsureBucketExistsAsync();
 
         var request = new GetPreSignedUrlRequest
@@ -33,30 +32,14 @@ public class S3StorageService : IStorageService
             ContentType = contentType
         };
 
-        // Metadata opcional para rastreamento
         request.ResponseHeaderOverrides.ContentType = contentType;
 
-        var url = _s3Client.GetPreSignedURL(request);
-
-        if (!string.IsNullOrEmpty(_externalServiceUrl) && Uri.TryCreate(url, UriKind.Absolute, out var originalUri))
-        {
-            var externalUri = new Uri(_externalServiceUrl);
-            var builder = new UriBuilder(originalUri)
-            {
-                Scheme = externalUri.Scheme,
-                Host = externalUri.Host,
-                Port = externalUri.Port
-            };
-            return builder.Uri.ToString();
-        }
-
-        return url;
+        // Retorna a URL gerada pelo SDK (que já deve estar configurado com a ServiceURL correta via DI)
+        return _s3Client.GetPreSignedURL(request);
     }
 
     private async Task EnsureBucketExistsAsync()
     {
-        // Check simplificado. Em produção de alta escala, evite fazer isso a cada request.
-        // Aqui é útil porque o LocalStack zera quando reinicia.
         try
         {
             await _s3Client.GetBucketLocationAsync(_bucketName);
