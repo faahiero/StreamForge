@@ -6,8 +6,9 @@ using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
 using Microsoft.AspNetCore.Authentication.JwtBearer; 
 using Microsoft.IdentityModel.Tokens; 
-using System.Text;
+using System.Text; 
 using Microsoft.OpenApi;
+using StreamForge.API.Middlewares; // Importar
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,7 +41,11 @@ builder.Services.AddHealthChecks()
     .AddCheck<S3HealthCheck>("S3")
     .AddCheck<DynamoDBHealthCheck>("DynamoDB");
 
-// 5. Autenticação JWT
+// 5. Tratamento de Erros (Global Exception Handler)
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
+// 6. Autenticação JWT
 builder.Services
     .AddAuthorization()
     .AddAuthentication(options =>
@@ -65,7 +70,7 @@ builder.Services
         };
     });
 
-// 6. Adicionar Controllers e OpenAPI
+// 7. Adicionar Controllers e OpenAPI
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
@@ -90,7 +95,10 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// 7. Middleware Pipeline
+// Middleware de Exception (Primeiro)
+app.UseExceptionHandler();
+
+// 8. Middleware Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
