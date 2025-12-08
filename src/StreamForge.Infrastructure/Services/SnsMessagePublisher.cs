@@ -1,9 +1,10 @@
 using System.Text.Json;
 using Amazon.SimpleNotificationService;
 using Amazon.SimpleNotificationService.Model;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options; // Importar
 using StreamForge.Application.Interfaces;
+using StreamForge.Infrastructure.Options; // Importar
 
 namespace StreamForge.Infrastructure.Services;
 
@@ -13,15 +14,13 @@ public class SnsMessagePublisher : IMessagePublisher
     private readonly ILogger<SnsMessagePublisher> _logger;
     private readonly string _topicArnPrefix;
 
-    public SnsMessagePublisher(IAmazonSimpleNotificationService snsClient, ILogger<SnsMessagePublisher> logger, IConfiguration configuration)
+    public SnsMessagePublisher(IAmazonSimpleNotificationService snsClient, ILogger<SnsMessagePublisher> logger, IOptions<AwsSettings> options)
     {
         _snsClient = snsClient;
         _logger = logger;
-        // Em LocalStack o ARN é previsível, mas em PROD viria do config.
-        // Vamos assumir que passamos o nome do tópico e ele resolve o ARN ou usa um prefixo configurado.
-        // Para simplificar, vou construir o ARN padrão do LocalStack ou pegar do config se houver.
-        var accountId = configuration["AWS:AccountId"] ?? "000000000000";
-        var region = configuration["AWS:Region"] ?? "us-east-1";
+        var region = options.Value.Region ?? "us-east-1";
+        // Em LocalStack, accountId é 000000000000
+        var accountId = "000000000000"; 
         _topicArnPrefix = $"arn:aws:sns:{region}:{accountId}:";
     }
 

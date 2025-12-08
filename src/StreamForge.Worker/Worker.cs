@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Amazon.SQS;
 using Amazon.SQS.Model;
+using Microsoft.Extensions.Options; // Importar
 using StreamForge.Application.Interfaces;
+using StreamForge.Infrastructure.Options; // Importar
 using StreamForge.Worker.Models;
 using StreamForge.Worker.Services;
 
@@ -15,14 +17,14 @@ public class Worker : BackgroundService
     private readonly IDistributedLockService _lockService;
     private readonly string _queueUrl;
 
-    public Worker(ILogger<Worker> logger, IAmazonSQS sqsClient, IConfiguration configuration, 
+    public Worker(ILogger<Worker> logger, IAmazonSQS sqsClient, IOptions<AwsSettings> options, 
                   IVideoProcessor videoProcessor, IDistributedLockService lockService)
     {
         _logger = logger;
         _sqsClient = sqsClient;
         _videoProcessor = videoProcessor;
         _lockService = lockService;
-        _queueUrl = configuration["AWS:QueueUrl"] ?? throw new ArgumentNullException("AWS:QueueUrl configuration is missing");
+        _queueUrl = options.Value.QueueUrl ?? throw new ArgumentNullException("AWS:QueueUrl configuration is missing");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
