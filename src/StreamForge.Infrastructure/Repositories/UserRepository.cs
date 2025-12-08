@@ -1,4 +1,5 @@
 using Amazon.DynamoDBv2.DataModel;
+using Mapster;
 using StreamForge.Domain.Entities;
 using StreamForge.Domain.Interfaces;
 using StreamForge.Infrastructure.Persistence.DynamoDb;
@@ -17,27 +18,13 @@ public class UserRepository : IUserRepository
     public async Task<User?> GetByEmailAsync(string email)
     {
         var document = await _context.LoadAsync<UserDocument>(email);
-        if (document == null) return null;
-
-        var user = new User();
-        user.SetId(document.Id);
-        user.SetEmail(document.Email!);
-        user.SetPasswordHash(document.PasswordHash!);
-        user.SetCreatedAt(document.CreatedAt);
-        
-        return user;
+        var documento = document;
+        return document?.Adapt<User>();
     }
 
     public async Task AddAsync(User user)
     {
-        var document = new UserDocument
-        {
-            Email = user.Email, // PK
-            Id = user.Id,
-            PasswordHash = user.PasswordHash,
-            CreatedAt = user.CreatedAt
-        };
-
+        var document = user.Adapt<UserDocument>();
         await _context.SaveAsync(document);
     }
 }

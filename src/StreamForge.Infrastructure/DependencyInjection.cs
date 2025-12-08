@@ -3,13 +3,14 @@ using Amazon.DynamoDBv2.DataModel;
 using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.SQS;
-using Amazon.SimpleNotificationService; // Importar SNS
+using Amazon.SimpleNotificationService;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StreamForge.Application.Interfaces;
 using StreamForge.Domain.Interfaces;
 using StreamForge.Infrastructure.Repositories;
 using StreamForge.Infrastructure.Services;
+using StreamForge.Infrastructure.Mappers;
 using StackExchange.Redis;
 
 namespace StreamForge.Infrastructure;
@@ -68,7 +69,7 @@ public static class DependencyInjection
             return new AmazonDynamoDBClient(awsOptions.Credentials, dynamoDbConfig);
         });
 
-        // SNS (Novo)
+        // SNS
         services.AddSingleton<IAmazonSimpleNotificationService>(sp => {
             var snsConfig = new AmazonSimpleNotificationServiceConfig();
             snsConfig.RegionEndpoint = awsOptions.Region;
@@ -79,14 +80,17 @@ public static class DependencyInjection
             return new AmazonSimpleNotificationServiceClient(awsOptions.Credentials, snsConfig);
         });
 
-        // Contexto do DynamoDB
+        // Contexto do DynamoDB (High-Level API)
         services.AddSingleton<IDynamoDBContext, DynamoDBContext>(); 
 
-        // Serviços
+        // Configurar Mapster
+        MapsterConfig.Configure();
+
+        // Serviços de Infraestrutura
         services.AddSingleton<IStorageService, S3StorageService>(); 
         services.AddSingleton<IVideoRepository, VideoRepository>(); 
         services.AddSingleton<IMessagePublisher, SnsMessagePublisher>(); 
-        services.AddSingleton<IMediaAnalyzer, FfmpegMediaAnalyzer>(); // Registrar Analyzer
+        services.AddSingleton<IMediaAnalyzer, FfmpegMediaAnalyzer>();
         
         // Auth
         services.AddSingleton<IUserRepository, UserRepository>();
