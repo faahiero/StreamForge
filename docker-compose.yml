@@ -98,8 +98,8 @@ services:
       - ACCEPT_EULA=Y
       - SEQ_FIRSTRUN_ADMINPASSWORD=admin
     ports:
-      - "5341:80"    # UI e Ingestão HTTP
-            - "4317:4317"  # Ingestão OTLP gRPC
-          volumes:
-            - "./.seq_data:/data"
+      - "5341:80"    # UI e Ingestão HTTP de Logs
+      - "4317:4317"  # Ingestão OTLP gRPC (Traces)
+    volumes:
+      - "./.seq_data:/data"
       
