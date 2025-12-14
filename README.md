@@ -68,12 +68,11 @@ docker-compose up -d --build
 ```
 
 ### 2. Testar (End-to-End)
-Um script de teste automatizado está incluído para validar todo o fluxo (Upload -> Processamento -> Notificação).
+O projeto inclui testes de integração completos em C# que validam o fluxo contra o ambiente Docker.
 
 ```bash
-# Rodar teste E2E via Docker
-chmod +x test_docker_e2e.sh
-./test_docker_e2e.sh
+# Rodar testes (Requer .NET SDK)
+dotnet test tests/StreamForge.E2E/StreamForge.E2E.csproj
 ```
 
 ### 3. Acessar Dashboards
@@ -113,9 +112,9 @@ Para um mergulho profundo na arquitetura, decisões de design e explicação pas
 O projeto possui uma pirâmide de testes completa:
 1.  **Unitários (`xUnit`):** Testam Regras de Domínio e Handlers isolados.
 2.  **Integração (`WebApplicationFactory`):** Testam a API e o pipeline HTTP em memória.
-3.  **E2E (`Test Script`):** Testam o sistema rodando no Docker com infraestrutura real simulada (LocalStack).
+3.  **E2E (`StreamForge.E2E`):** Testes em C# que validam o fluxo completo do sistema rodando no Docker.
 
-Para rodar os testes unitários (requer .NET SDK):
+Para rodar todos os testes:
 ```bash
 dotnet test
 ```
