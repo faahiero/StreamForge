@@ -77,18 +77,18 @@ services:
       - "./deploy/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh" # Script de Inicialização Automática
 
   # --------------------------------------------------------------------------
-  # Infra: Redis
-  # Cache Distribuído e Distributed Locking (RedLock)
+  # Redis: Cache Distribuído e Distributed Locking
   # --------------------------------------------------------------------------
   redis:
     container_name: streamforge_redis
     image: redis:alpine
     ports:
       - "6379:6379"
+    volumes:
+      - "./.redis_data:/data"
 
   # --------------------------------------------------------------------------
-  # Infra: Seq
-  # Centralização de Logs e Traces (OpenTelemetry)
+  # Seq: Logs Estruturados e Tracing (Substitui Jaeger)
   # UI: http://localhost:5341 (admin/admin)
   # --------------------------------------------------------------------------
   seq:
@@ -98,11 +98,8 @@ services:
       - ACCEPT_EULA=Y
       - SEQ_FIRSTRUN_ADMINPASSWORD=admin
     ports:
-      - "5341:80" # UI e Ingestão HTTP de Logs
-      - "4317:4317" # Ingestão OTLP gRPC (Traces)
-
-# ==============================================================================
-# Volumes Persistentes
-# ==============================================================================
-volumes:
-  localstack_data:
+      - "5341:80"    # UI e Ingestão HTTP
+            - "4317:4317"  # Ingestão OTLP gRPC
+          volumes:
+            - "./.seq_data:/data"
+      
