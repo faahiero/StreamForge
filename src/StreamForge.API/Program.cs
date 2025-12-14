@@ -14,11 +14,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1. Configuração de Logs (Serilog)
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}")
     .CreateBootstrapLogger();
 
 builder.Host.UseSerilog((ctx, lc) => lc
-    .WriteTo.Console()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}")
     .ReadFrom.Configuration(ctx.Configuration));
 
 // 2. Observabilidade (OpenTelemetry)
@@ -95,9 +95,6 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-// Middleware de Exception (Primeiro)
-app.UseExceptionHandler();
-
 // 8. Middleware Pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -105,7 +102,28 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(options =>
+{
+    options.GetLevel = (httpContext, elapsed, ex) =>
+    {
+        if (ex != null || httpContext.Response.StatusCode > 499)
+        {
+            // Se for exceção de domínio/validação, é Warning, não Error
+            if (ex is StreamForge.Domain.Exceptions.DomainException || 
+                ex is FluentValidation.ValidationException ||
+                ex is UnauthorizedAccessException)
+            {
+                return Serilog.Events.LogEventLevel.Warning;
+            }
+            return Serilog.Events.LogEventLevel.Error;
+        }
+        return Serilog.Events.LogEventLevel.Information;
+    };
+});
+
+// Middleware de Exception (Deve vir DEPOIS do Serilog para que o Serilog veja o status code tratado)
+app.UseExceptionHandler();
+
 app.UseHttpsRedirection();
 
 app.UseAuthentication(); 

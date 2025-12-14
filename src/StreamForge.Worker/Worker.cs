@@ -91,7 +91,7 @@ public class Worker : BackgroundService
             
             if (s3Event?.Records == null || s3Event.Records.Count == 0)
             {
-                _logger.LogWarning("⚠️ Mensagem ignorada (formato inválido ou não é evento S3).");
+                _logger.LogWarning("⚠️ Mensagem ignorada (formato inválido ou não é evento S3) : {Body}.", message.Body);
                 return;
             }
 

@@ -9,11 +9,11 @@ var builder = Host.CreateApplicationBuilder(args);
 
 // 1. Logs
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}")
     .CreateBootstrapLogger();
 
 builder.Services.AddSerilog((services, lc) => lc
-    .WriteTo.Console()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}")
     .ReadFrom.Configuration(builder.Configuration));
 
 // 2. Observabilidade (OpenTelemetry)

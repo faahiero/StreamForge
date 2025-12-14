@@ -18,8 +18,6 @@ public class GlobalExceptionHandler : IExceptionHandler
 
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        _logger.LogError(exception, "Exceção não tratada: {Message}", exception.Message);
-
         var problemDetails = new ProblemDetails
         {
             Instance = httpContext.Request.Path,
@@ -28,6 +26,8 @@ public class GlobalExceptionHandler : IExceptionHandler
 
         if (exception is ValidationException validationException)
         {
+            _logger.LogWarning(exception, "Validation failed: {Message}", exception.Message);
+
             httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
             problemDetails.Title = "Validation Failed";
             problemDetails.Status = (int)HttpStatusCode.BadRequest;
@@ -44,6 +44,8 @@ public class GlobalExceptionHandler : IExceptionHandler
         }
         else if (exception is NotFoundException notFoundEx)
         {
+            _logger.LogWarning(exception, "Resource not found: {Message}", exception.Message);
+
             httpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
             problemDetails.Title = "Not Found";
             problemDetails.Status = (int)HttpStatusCode.NotFound;
@@ -51,6 +53,8 @@ public class GlobalExceptionHandler : IExceptionHandler
         }
         else if (exception is DomainException domainEx)
         {
+            _logger.LogWarning(exception, "Domain rule violation: {Message}", exception.Message);
+
             httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
             problemDetails.Title = "Domain Rule Violation";
             problemDetails.Status = (int)HttpStatusCode.BadRequest;
@@ -58,6 +62,8 @@ public class GlobalExceptionHandler : IExceptionHandler
         }
         else if (exception is UnauthorizedAccessException)
         {
+            _logger.LogWarning(exception, "Unauthorized access attempt: {Message}", exception.Message);
+
             httpContext.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
             problemDetails.Title = "Unauthorized";
             problemDetails.Status = (int)HttpStatusCode.Unauthorized;
@@ -74,7 +80,7 @@ public class GlobalExceptionHandler : IExceptionHandler
         }
         else
         {
-            _logger.LogError(exception, "Exceção não tratada: {Message}", exception.Message);
+            _logger.LogError(exception, "Unhandled exception: {Message}", exception.Message);
             
             httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             problemDetails.Title = "Internal Server Error";
