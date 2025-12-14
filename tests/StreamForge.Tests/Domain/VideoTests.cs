@@ -1,6 +1,7 @@
 using FluentAssertions;
 using StreamForge.Domain.Entities;
 using StreamForge.Domain.Enums;
+using StreamForge.Domain.Exceptions; // Importar Exceções
 using Xunit;
 
 namespace StreamForge.Tests.Domain;
@@ -31,7 +32,7 @@ public class VideoTests
         Action act = () => new Video("", "original.mp4");
 
         // Assert
-        act.Should().Throw<ArgumentException>()
+        act.Should().Throw<ValidationDomainException>() // Atualizado
             .WithMessage("*FileName cannot be empty*");
     }
 
@@ -60,6 +61,6 @@ public class VideoTests
         Action act = () => video.MarkAsProcessing();
 
         // Assert
-        act.Should().Throw<InvalidOperationException>();
+        act.Should().Throw<ValidationDomainException>(); // Atualizado
     }
 }

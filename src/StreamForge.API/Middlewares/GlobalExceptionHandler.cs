@@ -1,7 +1,9 @@
+using System.Diagnostics; // Para Activity
 using System.Net;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using StreamForge.Domain.Exceptions; // Importar
 
 namespace StreamForge.API.Middlewares;
 
@@ -20,7 +22,8 @@ public class GlobalExceptionHandler : IExceptionHandler
 
         var problemDetails = new ProblemDetails
         {
-            Instance = httpContext.Request.Path
+            Instance = httpContext.Request.Path,
+            Extensions = { ["traceId"] = Activity.Current?.Id ?? httpContext.TraceIdentifier }
         };
 
         if (exception is ValidationException validationException)
@@ -30,7 +33,6 @@ public class GlobalExceptionHandler : IExceptionHandler
             problemDetails.Status = (int)HttpStatusCode.BadRequest;
             problemDetails.Detail = "One or more validation errors occurred.";
             
-            // Mapear erros de validação
             var errors = validationException.Errors
                 .GroupBy(e => e.PropertyName)
                 .ToDictionary(
@@ -40,6 +42,20 @@ public class GlobalExceptionHandler : IExceptionHandler
             
             problemDetails.Extensions["errors"] = errors;
         }
+        else if (exception is NotFoundException notFoundEx)
+        {
+            httpContext.Response.StatusCode = (int)HttpStatusCode.NotFound;
+            problemDetails.Title = "Not Found";
+            problemDetails.Status = (int)HttpStatusCode.NotFound;
+            problemDetails.Detail = notFoundEx.Message;
+        }
+        else if (exception is DomainException domainEx)
+        {
+            httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+            problemDetails.Title = "Domain Rule Violation";
+            problemDetails.Status = (int)HttpStatusCode.BadRequest;
+            problemDetails.Detail = domainEx.Message;
+        }
         else if (exception is UnauthorizedAccessException)
         {
             httpContext.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
@@ -47,15 +63,19 @@ public class GlobalExceptionHandler : IExceptionHandler
             problemDetails.Status = (int)HttpStatusCode.Unauthorized;
             problemDetails.Detail = exception.Message;
         }
-        else if (exception is InvalidOperationException)
+        else if (exception is OperationCanceledException)
         {
-            httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-            problemDetails.Title = "Invalid Operation";
-            problemDetails.Status = (int)HttpStatusCode.BadRequest;
-            problemDetails.Detail = exception.Message;
+            _logger.LogInformation("Requisição cancelada pelo cliente.");
+            
+            httpContext.Response.StatusCode = 499; // Client Closed Request
+            problemDetails.Title = "Request Cancelled";
+            problemDetails.Status = 499;
+            problemDetails.Detail = "The request was cancelled by the client.";
         }
         else
         {
+            _logger.LogError(exception, "Exceção não tratada: {Message}", exception.Message);
+            
             httpContext.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             problemDetails.Title = "Internal Server Error";
             problemDetails.Status = (int)HttpStatusCode.InternalServerError;

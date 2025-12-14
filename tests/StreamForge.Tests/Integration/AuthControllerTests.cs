@@ -8,7 +8,8 @@ using Xunit;
 
 namespace StreamForge.Tests.Integration;
 
-public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory<Program>>
+[Collection("IntegrationTests")]
+public class AuthControllerTests
 {
     private readonly HttpClient _client;
 

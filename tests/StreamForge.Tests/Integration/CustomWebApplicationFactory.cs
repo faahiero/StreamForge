@@ -10,12 +10,11 @@ public class CustomWebApplicationFactory<TProgram> : WebApplicationFactory<TProg
     {
         builder.ConfigureAppConfiguration((context, config) =>
         {
-            // Aqui podemos adicionar um appsettings.Test.json ou variáveis de ambiente
             var inMemorySettings = new Dictionary<string, string?> {
                 {"Jwt:Key", "super-secret-key-for-test-1234567890"},
                 {"Jwt:Issuer", "StreamForgeTest"},
                 {"Jwt:Audience", "StreamForgeTestUsers"},
-                {"AWS:ServiceURL", "http://localhost:4566"}, // Aponta para LocalStack se estiver rodando
+                {"AWS:ServiceURL", "http://localhost:4566"},
                 {"AWS:BucketName", "test-bucket"},
                 {"AWS:AccessKey", "test"},
                 {"AWS:SecretKey", "test"}

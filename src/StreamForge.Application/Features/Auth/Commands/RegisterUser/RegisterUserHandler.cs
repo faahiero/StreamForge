@@ -1,6 +1,7 @@
 using MediatR;
 using StreamForge.Application.Interfaces;
 using StreamForge.Domain.Entities;
+using StreamForge.Domain.Exceptions; // Importar
 using StreamForge.Domain.Interfaces;
 
 namespace StreamForge.Application.Features.Auth.Commands.RegisterUser;
@@ -22,7 +23,7 @@ public class RegisterUserHandler : IRequestHandler<RegisterUserCommand, Guid>
         var existingUser = await _userRepository.GetByEmailAsync(request.Email);
         if (existingUser != null)
         {
-            throw new InvalidOperationException("User already exists.");
+            throw new ValidationDomainException("User already exists.");
         }
 
         // 2. Hash Password
