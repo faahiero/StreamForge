@@ -85,13 +85,20 @@ public class Worker : BackgroundService
 
         try
         {
+            // Filtro para eventos de teste do S3 (são normais na configuração inicial)
+            if (message.Body.Contains("s3:TestEvent"))
+            {
+                _logger.LogInformation("ℹ️ Evento de teste de configuração S3 recebido e ignorado.");
+                return;
+            }
+
             _logger.LogInformation("📩 Processando mensagem: {MessageId}", message.MessageId);
 
             var s3Event = JsonSerializer.Deserialize<S3EventNotification>(message.Body);
             
             if (s3Event?.Records == null || s3Event.Records.Count == 0)
             {
-                _logger.LogWarning("⚠️ Mensagem ignorada (formato inválido ou não é evento S3) : {Body}.", message.Body);
+                _logger.LogWarning("⚠️ Mensagem ignorada (formato inválido ou não é evento S3).");
                 return;
             }
 
