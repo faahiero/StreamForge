@@ -2,37 +2,18 @@ using StreamForge.Application;
 using StreamForge.Infrastructure;
 using StreamForge.Infrastructure.HealthChecks; 
 using Serilog;
-using OpenTelemetry.Trace;
-using OpenTelemetry.Resources;
-using Microsoft.AspNetCore.Authentication.JwtBearer; 
-using Microsoft.IdentityModel.Tokens; 
-using System.Text; 
-using Microsoft.OpenApi;
-using StreamForge.API.Middlewares; // Importar
+using StreamForge.API.Middlewares;
+using StreamForge.API.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Configuração de Logs (Serilog)
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}")
-    .CreateBootstrapLogger();
+// 1. Logging
+builder.AddStreamForgeLogging();
 
-builder.Host.UseSerilog((ctx, lc) => lc
-    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}")
-    .ReadFrom.Configuration(ctx.Configuration));
+// 2. Observabilidade
+builder.Services.AddStreamForgeObservability();
 
-// 2. Observabilidade (OpenTelemetry)
-builder.Services.AddOpenTelemetry()
-    .WithTracing(tracerProviderBuilder =>
-    {
-        tracerProviderBuilder
-            .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("StreamForge.API"))
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddOtlpExporter();
-    });
-
-// 3. Adicionar Camadas (Clean Architecture)
+// 3. Camadas (Clean Arch)
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -41,61 +22,21 @@ builder.Services.AddHealthChecks()
     .AddCheck<S3HealthCheck>("S3")
     .AddCheck<DynamoDBHealthCheck>("DynamoDB");
 
-// 5. Tratamento de Erros (Global Exception Handler)
+// 6. Tratamento de Erros
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-// 6. Autenticação JWT
-builder.Services
-    .AddAuthorization()
-    .AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
-    .AddJwtBearer(options =>
-    {
-        var jwtKey = builder.Configuration["Jwt:Key"] ?? "super-secret-key-for-dev-1234567890";
-        var key = Encoding.UTF8.GetBytes(jwtKey);
+builder.Services.AddStreamForgeAuthentication(builder.Configuration);
 
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "StreamForge",
-            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "StreamForgeUsers",
-            IssuerSigningKey = new SymmetricSecurityKey(key)
-        };
-    });
-
-// 7. Adicionar Controllers e OpenAPI
+// 5. Autenticação e Swagger
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
-
-// Configurar Swagger com JWT Support
-builder.Services.AddSwaggerGen(options =>
-{
-    options.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
-    {
-        Name = "Authorization",
-        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.Http,
-        Scheme = "Bearer",
-        BearerFormat = "JWT"
-    });
-    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-    {
-        [new OpenApiSecuritySchemeReference("bearer", document)] = []
-    });
-});
+builder.Services.AddStreamForgeSwagger();
 
 var app = builder.Build();
 
-// 8. Middleware Pipeline
+// 7. Pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -108,7 +49,6 @@ app.UseSerilogRequestLogging(options =>
     {
         if (ex != null || httpContext.Response.StatusCode > 499)
         {
-            // Se for exceção de domínio/validação, é Warning, não Error
             if (ex is StreamForge.Domain.Exceptions.DomainException || 
                 ex is FluentValidation.ValidationException ||
                 ex is UnauthorizedAccessException)
@@ -121,9 +61,7 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
-// Middleware de Exception (Deve vir DEPOIS do Serilog para que o Serilog veja o status code tratado)
-app.UseExceptionHandler();
-
+app.UseExceptionHandler(); // DEPOIS do Serilog
 app.UseHttpsRedirection();
 
 app.UseAuthentication(); 

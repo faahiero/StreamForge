@@ -18,27 +18,58 @@ public class TokenService : ITokenService
         _settings = options.Value;
     }
 
-    public string GenerateToken(User user)
-    {
-        var jwtKey = _settings.Key ?? "super-secret-key-for-dev-1234567890"; 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        public string GenerateToken(User user)
 
-        var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
 
-        var token = new JwtSecurityToken(
-            issuer: _settings.Issuer ?? "StreamForge",
-            audience: _settings.Audience ?? "StreamForgeUsers",
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(2),
-            signingCredentials: creds
-        );
+            var jwtKey = _settings.Key ?? throw new ArgumentNullException(nameof(_settings.Key), "Jwt:Key is missing");
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+            var issuer = _settings.Issuer ?? throw new ArgumentNullException(nameof(_settings.Issuer), "Jwt:Issuer is missing");
+
+            var audience = _settings.Audience ?? throw new ArgumentNullException(nameof(_settings.Audience), "Jwt:Audience is missing");
+
+    
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+    
+
+            var claims = new[]
+
+            {
+
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+
+                new Claim(JwtRegisteredClaimNames.Email, user.Email),
+
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+
+            };
+
+    
+
+            var token = new JwtSecurityToken(
+
+                issuer: issuer,
+
+                audience: audience,
+
+                claims: claims,
+
+                expires: DateTime.UtcNow.AddHours(2),
+
+                signingCredentials: creds
+
+            );
+
+    
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+
+        }
+
     }
-}
+
+    

@@ -46,7 +46,9 @@ public class VideoProcessor : IVideoProcessor
         video.MarkAsProcessing();
         await _videoRepository.UpdateAsync(video);
 
-        var tempFile = Path.Combine(Path.GetTempPath(), $"{videoId}.mp4");
+        // Usar a extensão original do arquivo
+        var extension = Path.GetExtension(objectKey) ?? ".mp4";
+        var tempFile = Path.Combine(Path.GetTempPath(), $"{videoId}{extension}");
 
         try
         {

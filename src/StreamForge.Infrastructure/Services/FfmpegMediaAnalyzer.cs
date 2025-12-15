@@ -39,16 +39,20 @@ public class FfmpegMediaAnalyzer : IMediaAnalyzer
         using var process = new Process { StartInfo = startInfo };
         
         var outputBuilder = new System.Text.StringBuilder();
+        var errorBuilder = new System.Text.StringBuilder();
         
-        process.OutputDataReceived += (sender, args) => outputBuilder.AppendLine(args.Data);
+        process.OutputDataReceived += (sender, args) => { if (args.Data != null) outputBuilder.AppendLine(args.Data); };
+        process.ErrorDataReceived += (sender, args) => { if (args.Data != null) errorBuilder.AppendLine(args.Data); };
         
         process.Start();
         process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        
         await process.WaitForExitAsync();
 
         if (process.ExitCode != 0)
         {
-            var error = await process.StandardError.ReadToEndAsync();
+            var error = errorBuilder.ToString();
             _logger.LogError("FFprobe falhou: {Error}", error);
             throw new InvalidOperationException($"FFprobe failed with code {process.ExitCode}");
         }
